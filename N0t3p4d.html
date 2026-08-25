@@ -1,0 +1,1519 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Untitled - Notepad</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;700&family=Nanum+Myeongjo:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --gray:#C0C0C0;
+    --dark-gray:#808080;
+    --border:#000080;
+    --bg:#FFFFFF;
+    --fg:#000000;
+  }
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0; padding:0; height:100%;
+    background:var(--gray);
+    font-family:"Malgun Gothic","MS Sans Serif",sans-serif;
+    font-size:14px;
+    -webkit-tap-highlight-color:transparent;
+    user-select:none;
+  }
+  #app{ display:flex; flex-direction:column; height:100vh; overflow:hidden; }
+
+  /* ---------- top menu bar ---------- */
+  #menubar{
+    display:flex; background:var(--gray); border-bottom:1px solid var(--dark-gray);
+    position:relative; z-index:20;
+  }
+  .menu-btn{
+    background:none; border:none; padding:6px 12px; font-size:14px;
+    cursor:pointer;
+  }
+  .menu-btn:active, .menu-btn.open{ background:#000080; color:#fff; }
+  .dropdown{
+    display:none; position:absolute; top:100%; left:0; background:var(--gray);
+    border:2px outset #fff; min-width:200px; box-shadow:2px 2px 6px rgba(0,0,0,.4);
+    flex-direction:column; z-index:30;
+  }
+  .dropdown.show{ display:flex; }
+  .dropdown button{
+    background:none; border:none; text-align:left; padding:8px 14px;
+    font-size:13px; cursor:pointer; white-space:nowrap;
+  }
+  .dropdown button:active{ background:#000080; color:#fff; }
+  .dropdown hr{ border:none; border-top:1px solid var(--dark-gray); margin:2px 0; width:100%; }
+
+  /* ---------- toolbar ---------- */
+  #toolbar{
+    display:flex; align-items:center; gap:4px; padding:4px; background:var(--gray);
+    border-bottom:1px solid var(--dark-gray); flex-wrap:wrap;
+  }
+  .tbtn{
+    background:var(--gray); border:2px outset #fff; padding:5px 9px; font-size:13px; cursor:pointer;
+  }
+  .tbtn:active{ border-style:inset; }
+  .tbtn.active{ border-style:inset; background:#a8a8ff; }
+  #toolbar select, #toolbar input[type=number]{
+    border:2px inset #fff; padding:3px; font-size:13px;
+  }
+  #credit{ margin-left:auto; font-size:11px; font-style:italic; color:var(--dark-gray); padding-right:6px; }
+
+  /* ---------- editor ---------- */
+  #editor-wrap{ flex:1; padding:6px; overflow:hidden; display:flex; }
+  #editor-border{
+    flex:1; border:3px solid var(--border); background:var(--gray); padding:2px; overflow:hidden; display:flex;
+  }
+  #editor{
+    flex:1; background:var(--bg); color:var(--fg); overflow:auto; padding:10px;
+    outline:none; font-size:16px; line-height:1.5; user-select:text;
+  }
+  #editor img{ max-width:100%; cursor:pointer; touch-action:none; }
+  #editor a{ color:#0000EE; text-decoration:underline; cursor:pointer; }
+  #editor a:active{ color:#551A8B; }
+  #editor img.selected{ outline:3px dashed #000080; }
+  #editor img.dragging{ opacity:.35; }
+  .img-ghost{ position:fixed; pointer-events:none; z-index:999; opacity:.75; margin:0; }
+
+  /* ---------- status bar ---------- */
+  #statusbar{
+    background:var(--gray); border-top:1px solid #fff; box-shadow:inset 0 1px 0 var(--dark-gray);
+    padding:4px 10px; font-size:12px; text-align:right;
+  }
+
+  /* ---------- generic modal ---------- */
+  .modal-overlay{
+    display:none; position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:100;
+    align-items:center; justify-content:center;
+  }
+  .modal-overlay.show{ display:flex; }
+  .modal{
+    background:var(--gray); border:2px outset #fff; padding:18px 20px; min-width:240px;
+    box-shadow:3px 3px 10px rgba(0,0,0,.5);
+  }
+  .modal h3{ margin:0 0 12px; font-size:14px; }
+  .modal p{ font-size:13px; line-height:1.5; text-align:center; }
+  .modal label{ display:block; font-size:13px; margin:8px 0 4px; }
+  .modal input[type=text], .modal input[type=number]{
+    width:100%; padding:5px; border:2px inset #fff; font-size:13px;
+  }
+  .modal-actions{ display:flex; justify-content:center; gap:10px; margin-top:16px; }
+  .modal-btn{
+    background:var(--gray); border:2px outset #fff; padding:6px 14px; font-size:13px; cursor:pointer;
+  }
+  .modal-btn:active{ border-style:inset; }
+  #fontListModal ul{ list-style:none; margin:0; padding:0; border:2px inset #fff; background:#fff; max-height:220px; overflow:auto; }
+  #fontListModal li{ padding:8px 10px; font-size:13px; cursor:pointer; }
+  #fontListModal li.selected{ background:#000080; color:#fff; }
+
+  /* dark mode */
+  body.dark #editor{ background:#1E1E1E; color:#E0E0E0; }
+
+  input[type=file]{ display:none; }
+
+  /* ---------- Paint ---------- */
+  #paintOverlay{
+    display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:200;
+    align-items:center; justify-content:center;
+  }
+  #paintOverlay.show{ display:flex; }
+  #paintWindow{
+    background:var(--gray); border:2px outset #fff; box-shadow:3px 3px 12px rgba(0,0,0,.5);
+    width:96vw; height:92vh; max-width:960px; display:flex; flex-direction:column; overflow:hidden;
+  }
+  #paintTitlebar{
+    background:linear-gradient(90deg,#000080,#1084d0); color:#fff; padding:5px 8px;
+    font-size:13px; display:flex; justify-content:space-between; align-items:center;
+  }
+  #paintTitlebar button{
+    background:var(--gray); border:1px outset #fff; width:20px; height:18px; font-size:11px; cursor:pointer;
+  }
+  #paintToolbar{
+    display:flex; flex-wrap:wrap; gap:4px; padding:4px; background:var(--gray);
+    border-bottom:1px solid var(--dark-gray); align-items:center;
+  }
+  #paintToolbar .tbtn.tool-active{ border-style:inset; background:#a8a8ff; }
+  #paintToolbar label{ font-size:12px; display:flex; align-items:center; gap:4px; }
+  #paintToolbar input[type=number]{ width:56px; border:2px inset #fff; padding:3px; font-size:12px; }
+  #paintToolbar input[type=color]{ width:34px; height:26px; border:2px inset #fff; padding:0; }
+  #paintBody{ flex:1; display:flex; overflow:hidden; }
+  #paintCanvasArea{
+    flex:1; overflow:auto; background:#7a7a7a; display:flex; align-items:flex-start;
+    justify-content:flex-start; padding:12px;
+  }
+  #paintCanvasWrap{ position:relative; background:#fff; box-shadow:0 0 0 2px #000080; }
+  #paintCanvasWrap canvas{
+    position:absolute; top:0; left:0; touch-action:none; image-rendering:pixelated;
+  }
+  #paintLayers{
+    width:190px; background:var(--gray); border-left:1px solid var(--dark-gray);
+    display:flex; flex-direction:column; padding:6px; gap:6px; overflow-y:auto;
+  }
+  #paintLayers h4{ margin:0 0 4px; font-size:12px; }
+  #paintLayerList{ display:flex; flex-direction:column; gap:3px; }
+  .layer-row{
+    display:flex; align-items:center; gap:4px; border:2px inset #fff; background:#fff;
+    padding:3px 4px; font-size:11px; cursor:pointer;
+  }
+  .layer-row.active{ background:#a8a8ff; }
+  .layer-row input[type=checkbox]{ width:auto; }
+  .layer-row span{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .alpha-lock-label{
+    display:flex; align-items:center; gap:2px; font-size:10px; flex-shrink:0;
+    border-left:1px solid var(--dark-gray); padding-left:4px;
+  }
+  .alpha-lock-label input{ width:12px; height:12px; }
+  #paintLayerBtns{ display:flex; gap:4px; flex-wrap:wrap; }
+  #paintLayerBtns .tbtn{ padding:4px 6px; font-size:11px; }
+  #paintBottomBar{
+    display:flex; gap:6px; padding:6px; background:var(--gray); border-top:1px solid #fff;
+    box-shadow:inset 0 1px 0 var(--dark-gray); justify-content:flex-end;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- MENU BAR -->
+  <div id="menubar">
+    <button class="menu-btn" data-menu="fileMenu">File(F)</button>
+    <button class="menu-btn" data-menu="editMenu">Edit(E)</button>
+    <button class="menu-btn" data-menu="insertMenu">Insert(I)</button>
+    <button class="menu-btn" data-menu="formatMenu">Format(O)</button>
+
+    <div class="dropdown" id="fileMenu">
+      <button data-act="new">New file</button>
+      <button data-act="open">Open</button>
+      <button data-act="save">Save</button>
+      <button data-act="saveas">Save as...</button>
+    </div>
+    <div class="dropdown" id="editMenu">
+      <button data-act="undo">Undo</button>
+      <button data-act="redo">Redo</button>
+      <hr>
+      <button data-act="selectall">Select all</button>
+    </div>
+    <div class="dropdown" id="insertMenu">
+      <button data-act="insertimage">Insert image</button>
+      <button data-act="resizeimage">Resize image</button>
+      <hr>
+      <button data-act="openpaint">Open Paint...</button>
+    </div>
+    <div class="dropdown" id="formatMenu">
+      <button data-act="changefont">Change font</button>
+      <button data-act="changefontsize">Change font size</button>
+      <hr>
+      <button data-act="bold">Bold</button>
+      <button data-act="italic">Italic</button>
+      <button data-act="underline">Underline</button>
+      <button data-act="strike">Strike</button>
+      <hr>
+      <button data-act="bgcolor">Change bg color</button>
+      <button data-act="textcolor">Change text color</button>
+      <hr>
+      <button data-act="bordercolor">Change border color</button>
+      <hr>
+      <button data-act="darkmode">Turn on / off </button>
+    </div>
+  </div>
+
+  <!-- TOOLBAR -->
+  <div id="toolbar">
+    <button class="tbtn" data-act="new">New file</button>
+    <button class="tbtn" data-act="open">Open</button>
+    <button class="tbtn" data-act="save">Save</button>
+    <button class="tbtn" data-act="undo">↶</button>
+    <button class="tbtn" data-act="redo">↷</button>
+    <button class="tbtn" id="boldBtn" data-act="bold"><b>B</b></button>
+    <button class="tbtn" id="italicBtn" data-act="italic"><i>I</i></button>
+    <button class="tbtn" id="underlineBtn" data-act="underline"><u>U</u></button>
+    <button class="tbtn" id="strikeBtn" data-act="strike"><s>S</s></button>
+    <button class="tbtn" data-act="insertimage">Insert image</button>
+    <button class="tbtn" data-act="openpaint">Paint</button>
+    <button class="tbtn" data-act="darkmode">Dark mode</button>
+    <span id="credit">Made by F3L1X_ </span>
+  </div>
+
+  <!-- EDITOR -->
+  <div id="editor-wrap">
+    <div id="editor-border">
+      <div id="editor" contenteditable="true" spellcheck="false"></div>
+    </div>
+  </div>
+
+  <!-- STATUS BAR -->
+  <div id="statusbar">Chars: 0 | Words: 0 | Ln 1, Col 1</div>
+
+</div>
+
+<input type="file" id="openFileInput" accept=".html,.htm,.txt">
+<input type="file" id="imageFileInput" accept="image/*">
+
+<!-- Generic confirm/trash modal -->
+<div class="modal-overlay" id="trashModal">
+  <div class="modal">
+    <h3>Hold up!</h3>
+    <p>Do u rlly want 2 trash ur unsaved text??</p>
+    <div class="modal-actions">
+      <button class="modal-btn" id="trashYe">Ye</button>
+      <button class="modal-btn" id="trashNuhuh">Nuh uh</button>
+    </div>
+  </div>
+</div>
+
+<!-- font size modal -->
+<div class="modal-overlay" id="fontSizeModal">
+  <div class="modal">
+    <h3>Set text size</h3>
+    <p style="font-size:11px;color:var(--dark-gray);margin:0 0 8px;">Applies to the selected text, or the whole document if nothing's selected.</p>
+    <label>Text size(px):</label>
+    <input type="number" id="fontSizeInput" min="6" max="200" value="16">
+    <div class="modal-actions">
+      <button class="modal-btn" id="fontSizeApply">Apply</button>
+      <button class="modal-btn" id="fontSizeCancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- font family modal -->
+<div class="modal-overlay" id="fontListModal">
+  <div class="modal">
+    <h3>Change font</h3>
+    <ul id="fontListUl"></ul>
+    <div class="modal-actions">
+      <button class="modal-btn" id="fontListApply">Apply</button>
+      <button class="modal-btn" id="fontListCancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- image resize modal -->
+<div class="modal-overlay" id="imgResizeModal">
+  <div class="modal">
+    <h3>Resize image</h3>
+    <label>Width(px):</label>
+    <input type="number" id="imgWidthInput" min="10" max="4000">
+    <label>Height(px):</label>
+    <input type="number" id="imgHeightInput" min="10" max="4000">
+    <label style="display:flex;align-items:center;gap:6px;margin-top:10px;">
+      <input type="checkbox" id="imgKeepRatio" checked style="width:auto;"> Keep aspect ratio
+    </label>
+    <div class="modal-actions">
+      <button class="modal-btn" id="imgResizeApply">Apply</button>
+      <button class="modal-btn" id="imgResizeCancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- alert modal -->
+<div class="modal-overlay" id="alertModal">
+  <div class="modal">
+    <h3 id="alertTitle">Notice</h3>
+    <p id="alertMsg"></p>
+    <div class="modal-actions">
+      <button class="modal-btn" id="alertOk">Ok</button>
+    </div>
+  </div>
+</div>
+
+<!-- paint: new canvas size modal -->
+<div class="modal-overlay" id="paintNewModal">
+  <div class="modal">
+    <h3>New canvas</h3>
+    <label>Width (px):</label>
+    <input type="number" id="paintNewWidth" min="16" max="4000" value="1920">
+    <label>Height (px):</label>
+    <input type="number" id="paintNewHeight" min="16" max="4000" value="1080">
+    <div class="modal-actions">
+      <button class="modal-btn" id="paintNewApply">Create</button>
+      <button class="modal-btn" id="paintNewCancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- paint: main window -->
+<div id="paintOverlay">
+  <div id="paintWindow">
+    <div id="paintTitlebar">
+      <span>Paint</span>
+      <button id="paintCloseX">✕</button>
+    </div>
+    <div id="paintToolbar">
+      <button class="tbtn" id="paintUndoBtn" title="Undo">↶ Undo</button>
+      <button class="tbtn" id="paintRedoBtn" title="Redo">↷ Redo</button>
+      <button class="tbtn" data-tool="brush" title="Brush">Brush</button>
+      <button class="tbtn" data-tool="eraser" title="Eraser">Eraser</button>
+      <button class="tbtn" data-tool="eyedropper" title="Eyedropper: pick a color from the canvas">Eyedropper</button>
+      <button class="tbtn" data-tool="lasso" title="Lasso select (move)">Lasso Move</button>
+      <button class="tbtn" data-tool="lasso-fill" title="Fill inside a lasso'd area">Lasso Fill</button>
+      <button class="tbtn" data-tool="lasso-erase" title="Erase inside a lasso'd area">Lasso Erase</button>
+      <label>Size(px): <input type="number" id="paintBrushSize" min="1" max="64" value="4"></label>
+      <label>Color: <input type="color" id="paintBrushColor" value="#000000"></label>
+      <label>Opacity(%): <input type="number" id="paintOpacity" min="1" max="100" value="100" style="width:52px;"></label>
+      <button class="tbtn" id="paintClearLayer">Clear layer</button>
+      <button class="tbtn" id="paintNewCanvasBtn">New canvas</button>
+      <button class="tbtn" id="paintZoomOut">－</button>
+      <input type="number" id="paintZoomInput" min="25" max="600" step="1" value="100" style="width:56px;">
+      <span style="font-size:12px;">%</span>
+      <button class="tbtn" id="paintZoomIn">＋</button>
+      <button class="tbtn" id="paintZoomReset">Reset zoom</button>
+    </div>
+    <div id="paintBody">
+      <div id="paintCanvasArea">
+        <div id="paintCanvasWrap"></div>
+      </div>
+      <div id="paintLayers">
+        <h4>Layers</h4>
+        <div id="paintLayerList"></div>
+        <div id="paintLayerBtns">
+          <button class="tbtn" id="paintAddLayer">+ Add</button>
+          <button class="tbtn" id="paintDelLayer">- Del</button>
+          <button class="tbtn" id="paintDupLayer">Dup</button>
+          <button class="tbtn" id="paintMergeDown">Merge dn</button>
+          <button class="tbtn" id="paintLayerUp">▲</button>
+          <button class="tbtn" id="paintLayerDown">▼</button>
+        </div>
+      </div>
+    </div>
+    <div id="paintBottomBar">
+      <button class="modal-btn" id="paintCancelBtn">Cancel</button>
+      <button class="modal-btn" id="paintInsertBtn">Insert into document</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const editor = document.getElementById('editor');
+  const statusbar = document.getElementById('statusbar');
+  // 바탕/궁서 aren't installed on Android, so the browser silently falls back to
+  // sans-serif for Korean text. These are real web fonts (loaded via Google Fonts
+  // link above) that actually render as Korean serif on a Galaxy Tab.
+  const AVAILABLE_FONTS = ["Nanum Myeongjo","Noto Serif KR","Times New Roman","Georgia","Cambria"];
+  let fontFamily = AVAILABLE_FONTS[0];
+  let fontSizePx = 16;
+  let currentFileName = null;
+  let unsaved = false;
+  let selectedImage = null;
+  let savedSelectionRange = null;
+
+  editor.style.fontFamily = fontFamily;
+  editor.style.fontSize = fontSizePx + 'px';
+  try{ document.execCommand('defaultParagraphSeparator', false, 'br'); }catch(e){}
+
+  // ---------- helpers ----------
+  function showAlert(msg, title){
+    document.getElementById('alertTitle').textContent = title || 'Notice';
+    document.getElementById('alertMsg').textContent = msg;
+    document.getElementById('alertModal').classList.add('show');
+  }
+  document.getElementById('alertOk').onclick = () => document.getElementById('alertModal').classList.remove('show');
+
+  function closeAllDropdowns(){
+    document.querySelectorAll('.dropdown').forEach(d => d.classList.remove('show'));
+    document.querySelectorAll('.menu-btn').forEach(b => b.classList.remove('open'));
+  }
+
+  function updateStatus(){
+    const text = editor.innerText || '';
+    const chars = text.replace(/\n/g,'').length;
+    const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+    const pos = getCaretLineCol();
+    const lnCol = pos ? `Ln ${pos.line}, Col ${pos.col}` : 'Ln 1, Col 1';
+    statusbar.textContent = `Chars: ${chars} | Words: ${words} | ${lnCol}`;
+  }
+
+  // Works out the current caret's logical line/column, Windows-Notepad style.
+  // "Line" here means text separated by actual line breaks (<br> / block edges),
+  // not visually-wrapped lines -- matching what Ln/Col means in real Notepad.
+  function getCaretLineCol(){
+    const sel = window.getSelection();
+    if(!sel.rangeCount || !editor.contains(sel.anchorNode)) return null;
+    const range = sel.getRangeAt(0);
+    const preRange = document.createRange();
+    preRange.selectNodeContents(editor);
+    preRange.setEnd(range.endContainer, range.endOffset);
+    const frag = preRange.cloneContents();
+    const holder = document.createElement('div');
+    holder.appendChild(frag);
+    holder.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
+    // fallback for pasted/legacy content that still uses <div>/<p> blocks
+    holder.querySelectorAll('div,p').forEach(el => el.insertAdjacentText('afterend', '\n'));
+    const text = holder.textContent || '';
+    const lines = text.split('\n');
+    return { line: lines.length, col: lines[lines.length - 1].length + 1 };
+  }
+
+  function markUnsaved(){ unsaved = true; }
+
+  function titleUpdate(){
+    document.title = (currentFileName || 'Untitled') + ' - Notepad';
+  }
+
+  // ---------- menu bar toggle ----------
+  document.querySelectorAll('.menu-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const dd = document.getElementById(btn.dataset.menu);
+      const wasOpen = dd.classList.contains('show');
+      closeAllDropdowns();
+      if(!wasOpen){ dd.classList.add('show'); btn.classList.add('open'); }
+    });
+  });
+  document.addEventListener('click', closeAllDropdowns);
+
+  // ---------- action dispatch ----------
+  function runAction(act){
+    switch(act){
+      case 'new': doNew(); break;
+      case 'open': doOpen(); break;
+      case 'save': doSave(); break;
+      case 'saveas': doSaveAs(); break;
+      case 'undo': document.execCommand('undo'); break;
+      case 'redo': document.execCommand('redo'); break;
+      case 'selectall': selectAllText(); break;
+      case 'insertimage': document.getElementById('imageFileInput').click(); break;
+      case 'resizeimage': openImageResize(); break;
+      case 'openpaint': Paint.open(); break;
+      case 'changefont': openFontList(); break;
+      case 'changefontsize': openFontSize(); break;
+      case 'bold': toggleInline('bold'); break;
+      case 'italic': toggleInline('italic'); break;
+      case 'underline': toggleInline('underline'); break;
+      case 'strike': toggleInline('strikeThrough'); break;
+      case 'bgcolor': changeBgColor(); break;
+      case 'textcolor': changeTextColor(); break;
+      case 'bordercolor': changeBorderColor(); break;
+      case 'darkmode': toggleDarkMode(); break;
+    }
+  }
+  document.querySelectorAll('[data-act]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      runAction(el.dataset.act);
+      closeAllDropdowns();
+    });
+  });
+
+  function toggleInline(cmd){
+    editor.focus();
+    if(document.getSelection().isCollapsed){
+      showAlert('Select text first bruh');
+      return;
+    }
+    document.execCommand(cmd);
+    refreshToolbarState();
+  }
+
+  function refreshToolbarState(){
+    document.getElementById('boldBtn').classList.toggle('active', document.queryCommandState('bold'));
+    document.getElementById('italicBtn').classList.toggle('active', document.queryCommandState('italic'));
+    document.getElementById('underlineBtn').classList.toggle('active', document.queryCommandState('underline'));
+    document.getElementById('strikeBtn').classList.toggle('active', document.queryCommandState('strikeThrough'));
+    updateStatus();
+  }
+
+  // covers caret moves that don't fire keyup/mouseup on the editor itself,
+  // e.g. dragging the touch selection handles on a tablet
+  document.addEventListener('selectionchange', () => {
+    const sel = window.getSelection();
+    if(sel.rangeCount && editor.contains(sel.anchorNode)) updateStatus();
+  });
+
+  function selectAllText(){
+    editor.focus();
+    const range = document.createRange();
+    range.selectNodeContents(editor);
+    const sel = document.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
+  // ---------- file: new / open / save ----------
+  function resetEditor(){
+    editor.innerHTML = '';
+    currentFileName = null;
+    unsaved = false;
+    updateStatus();
+    titleUpdate();
+  }
+
+  function doNew(){
+    confirmDiscard(() => resetEditor());
+  }
+
+  function confirmDiscard(proceedCb){
+    if(!unsaved){ proceedCb(); return; }
+    const overlay = document.getElementById('trashModal');
+    overlay.classList.add('show');
+    const ye = document.getElementById('trashYe');
+    const nuh = document.getElementById('trashNuhuh');
+    const cleanup = () => {
+      overlay.classList.remove('show');
+      ye.onclick = null; nuh.onclick = null;
+    };
+    ye.onclick = () => { cleanup(); proceedCb(); };
+    nuh.onclick = () => { cleanup(); doSave(); proceedCb(); };
+  }
+
+  function doOpen(){
+    confirmDiscard(() => document.getElementById('openFileInput').click());
+  }
+  document.getElementById('openFileInput').addEventListener('change', function(e){
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = function(){
+      if(file.name.toLowerCase().endsWith('.txt')){
+        editor.innerText = reader.result;
+      } else {
+        // extract body content if it's a full saved html doc, else use raw
+        const match = /<div id="editor"[^>]*>([\s\S]*)<\/div>\s*<\/body>/i.exec(reader.result);
+        editor.innerHTML = match ? match[1] : reader.result;
+      }
+      currentFileName = file.name;
+      unsaved = false;
+      bindAllEditorImages();
+      updateStatus();
+      titleUpdate();
+    };
+    reader.readAsText(file, 'utf-8');
+    e.target.value = '';
+  });
+
+  function doSave(){
+    if(currentFileName){
+      writeFile(currentFileName);
+    } else {
+      doSaveAs();
+    }
+  }
+  function doSaveAs(){
+    const name = prompt('Name da file bru (Ex: Memo.html)', currentFileName || 'Untitled.html');
+    if(!name) return;
+    currentFileName = name;
+    writeFile(name);
+    titleUpdate();
+  }
+  function writeFile(name){
+    const fullHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${name}</title></head><body>
+<div id="editor" style="font-family:${fontFamily};font-size:${fontSizePx}px;">${editor.innerHTML}</div>
+</body></html>`;
+    const blob = new Blob([fullHtml], {type:'text/html;charset=utf-8'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name.match(/\.\w+$/) ? name : name + '.html';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    unsaved = false;
+    showAlert('File saved lol', 'Saved');
+  }
+
+  // ---------- images ----------
+  document.getElementById('imageFileInput').addEventListener('change', function(e){
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = function(){
+      editor.focus();
+      const img = document.createElement('img');
+      img.src = reader.result;
+      img.style.maxWidth = '400px';
+      bindImageInteractions(img);
+      const sel = document.getSelection();
+      if(sel.rangeCount > 0 && editor.contains(sel.anchorNode)){
+        const range = sel.getRangeAt(0);
+        range.collapse(false);
+        range.insertNode(img);
+      } else {
+        editor.appendChild(img);
+      }
+      selectImage(img);
+      markUnsaved();
+      updateStatus();
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  });
+
+  function selectImage(img){
+    if(selectedImage) selectedImage.classList.remove('selected');
+    selectedImage = img;
+    img.classList.add('selected');
+    statusbar.textContent = `Image selected (Size: ${img.naturalWidth || img.width}x${img.naturalHeight || img.height}px)`;
+  }
+  editor.addEventListener('click', function(e){
+    const link = e.target.closest && e.target.closest('a');
+    if(link && editor.contains(link)){
+      // contenteditable normally just moves the caret on a link click --
+      // force it to actually open the site instead, like a real browser link
+      e.preventDefault();
+      window.open(link.href, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    if(selectedImage){ selectedImage.classList.remove('selected'); selectedImage = null; updateStatus(); }
+  });
+
+  // click to select, press-and-drag to reposition anywhere in the document.
+  // Dragging shows a floating "ghost" copy under the finger/cursor and only
+  // moves the real <img> once you lift, dropped wherever the caret lands.
+  function bindImageInteractions(img){
+    let dragging = false;
+    let justDragged = false;
+    let startX = 0, startY = 0;
+    let ghost = null;
+    const THRESHOLD = 8;
+
+    img.addEventListener('pointerdown', (e) => {
+      startX = e.clientX; startY = e.clientY;
+      dragging = false;
+      try{ img.setPointerCapture(e.pointerId); }catch(err){}
+    });
+
+    img.addEventListener('pointermove', (e) => {
+      const dx = e.clientX - startX, dy = e.clientY - startY;
+      if(!dragging && Math.hypot(dx, dy) > THRESHOLD){
+        dragging = true;
+        img.classList.add('dragging');
+        ghost = img.cloneNode(true);
+        ghost.className = 'img-ghost';
+        ghost.style.width = img.offsetWidth + 'px';
+        ghost.style.height = img.offsetHeight + 'px';
+        document.body.appendChild(ghost);
+      }
+      if(dragging){
+        e.preventDefault();
+        ghost.style.left = (e.clientX - ghost.offsetWidth / 2) + 'px';
+        ghost.style.top = (e.clientY - ghost.offsetHeight / 2) + 'px';
+      }
+    });
+
+    function endDrag(e){
+      if(!dragging) return;
+      dragging = false;
+      justDragged = true;
+      img.classList.remove('dragging');
+      if(ghost){ ghost.remove(); ghost = null; }
+
+      let range = null;
+      if(document.caretRangeFromPoint){
+        range = document.caretRangeFromPoint(e.clientX, e.clientY);
+      } else if(document.caretPositionFromPoint){
+        const pos = document.caretPositionFromPoint(e.clientX, e.clientY);
+        if(pos){ range = document.createRange(); range.setStart(pos.offsetNode, pos.offset); range.collapse(true); }
+      }
+      if(range && editor.contains(range.startContainer)){
+        img.remove();
+        range.insertNode(img);
+      }
+      selectImage(img);
+      markUnsaved();
+      updateStatus();
+    }
+    img.addEventListener('pointerup', endDrag);
+    img.addEventListener('pointercancel', () => {
+      dragging = false;
+      img.classList.remove('dragging');
+      if(ghost){ ghost.remove(); ghost = null; }
+    });
+
+    img.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      if(justDragged){ justDragged = false; return; }
+      selectImage(img);
+    });
+  }
+
+  // re-attach select/drag behavior to every image after loading a saved file,
+  // since images restored via innerHTML come back with no listeners at all
+  function bindAllEditorImages(){
+    editor.querySelectorAll('img').forEach(img => bindImageInteractions(img));
+  }
+
+  function openImageResize(){
+    if(!selectedImage){
+      showAlert('Click da image first bruh');
+      return;
+    }
+    const curW = selectedImage.offsetWidth || selectedImage.naturalWidth;
+    const curH = selectedImage.offsetHeight || selectedImage.naturalHeight;
+    document.getElementById('imgWidthInput').value = curW;
+    document.getElementById('imgHeightInput').value = curH;
+    document.getElementById('imgResizeModal').classList.add('show');
+  }
+  document.getElementById('imgResizeCancel').onclick = () => document.getElementById('imgResizeModal').classList.remove('show');
+
+  // when "keep aspect ratio" is on, editing one field live-updates the other
+  document.getElementById('imgWidthInput').addEventListener('input', () => {
+    if(!selectedImage || !document.getElementById('imgKeepRatio').checked) return;
+    const w = parseInt(document.getElementById('imgWidthInput').value, 10);
+    if(!w) return;
+    const ratio = selectedImage.naturalHeight / selectedImage.naturalWidth;
+    document.getElementById('imgHeightInput').value = Math.round(w * ratio);
+  });
+  document.getElementById('imgHeightInput').addEventListener('input', () => {
+    if(!selectedImage || !document.getElementById('imgKeepRatio').checked) return;
+    const h = parseInt(document.getElementById('imgHeightInput').value, 10);
+    if(!h) return;
+    const ratio = selectedImage.naturalWidth / selectedImage.naturalHeight;
+    document.getElementById('imgWidthInput').value = Math.round(h * ratio);
+  });
+
+  document.getElementById('imgResizeApply').onclick = () => {
+    const w = parseInt(document.getElementById('imgWidthInput').value, 10);
+    const h = parseInt(document.getElementById('imgHeightInput').value, 10);
+    if(!w || !h || isNaN(w) || isNaN(h)){ showAlert('Numbers only lol', 'Error'); return; }
+    const clampedW = Math.max(10, Math.min(4000, w));
+    const clampedH = Math.max(10, Math.min(4000, h));
+    // the image was inserted with an inline max-width:400px cap (see insertImage /
+    // Paint insertIntoDocument) so it displays at a sane size by default -- that
+    // cap has to be cleared here, otherwise width can never grow past 400px and
+    // only height (uncapped) visibly changes.
+    selectedImage.style.maxWidth = 'none';
+    selectedImage.style.width = clampedW + 'px';
+    selectedImage.style.height = clampedH + 'px';
+    document.getElementById('imgResizeModal').classList.remove('show');
+    markUnsaved();
+  };
+
+  // ---------- font family ----------
+  function openFontList(){
+    const ul = document.getElementById('fontListUl');
+    ul.innerHTML = '';
+    AVAILABLE_FONTS.forEach(f => {
+      const li = document.createElement('li');
+      li.textContent = f;
+      li.style.fontFamily = f;
+      if(f === fontFamily) li.classList.add('selected');
+      li.onclick = () => {
+        ul.querySelectorAll('li').forEach(x => x.classList.remove('selected'));
+        li.classList.add('selected');
+      };
+      ul.appendChild(li);
+    });
+    document.getElementById('fontListModal').classList.add('show');
+  }
+  document.getElementById('fontListCancel').onclick = () => document.getElementById('fontListModal').classList.remove('show');
+  document.getElementById('fontListApply').onclick = () => {
+    const sel = document.querySelector('#fontListUl li.selected');
+    if(sel){
+      fontFamily = sel.textContent;
+      editor.style.fontFamily = fontFamily;
+      markUnsaved();
+    }
+    document.getElementById('fontListModal').classList.remove('show');
+  };
+
+  // ---------- font size ----------
+  function openFontSize(){
+    const sel = window.getSelection();
+    // the selection is about to be lost once focus moves to the modal's
+    // button/input, so grab it now and restore it right before applying
+    savedSelectionRange = (sel.rangeCount && !sel.isCollapsed && editor.contains(sel.anchorNode))
+      ? sel.getRangeAt(0).cloneRange() : null;
+    document.getElementById('fontSizeInput').value = fontSizePx;
+    document.getElementById('fontSizeModal').classList.add('show');
+  }
+  document.getElementById('fontSizeCancel').onclick = () => document.getElementById('fontSizeModal').classList.remove('show');
+  document.getElementById('fontSizeApply').onclick = () => {
+    const v = parseInt(document.getElementById('fontSizeInput').value, 10);
+    if(!v || isNaN(v)){ showAlert('Numbers only lol', 'Error'); return; }
+    const px = Math.max(6, Math.min(200, v));
+    document.getElementById('fontSizeModal').classList.remove('show');
+    editor.focus();
+
+    let hadSelection = false;
+    if(savedSelectionRange){
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(savedSelectionRange);
+      hadSelection = !sel.isCollapsed;
+    }
+    if(hadSelection){
+      applyFontSizeToSelection(px);
+    } else {
+      fontSizePx = px;
+      editor.style.fontSize = px + 'px';
+    }
+    savedSelectionRange = null;
+    markUnsaved();
+  };
+
+  // classic trick: execCommand('fontSize') only accepts sizes 1-7, so mark
+  // the selection with the largest one (7), then swap that marker out for a
+  // real pixel size via inline style
+  function applyFontSizeToSelection(px){
+    document.execCommand('fontSize', false, '7');
+    editor.querySelectorAll('font[size="7"]').forEach(f => {
+      f.removeAttribute('size');
+      f.style.fontSize = px + 'px';
+    });
+  }
+
+  // ---------- colors ----------
+  function pickColor(defaultColor, cb){
+    const input = document.createElement('input');
+    input.type = 'color';
+    input.value = defaultColor || '#000000';
+    input.addEventListener('input', () => cb(input.value));
+    input.click();
+  }
+  function changeBgColor(){
+    pickColor('#ffffff', (color) => {
+      editor.style.background = color;
+      document.body.classList.remove('dark');
+      markUnsaved();
+    });
+  }
+  function changeTextColor(){
+    if(document.getSelection().isCollapsed){
+      showAlert('Select text 2 color first bruh');
+      return;
+    }
+    pickColor('#000000', (color) => {
+      document.execCommand('foreColor', false, color);
+      markUnsaved();
+    });
+  }
+  function changeBorderColor(){
+    pickColor('#000080', (color) => {
+      document.getElementById('editor-border').style.borderColor = color;
+      markUnsaved();
+    });
+  }
+
+  function toggleDarkMode(){
+    document.body.classList.toggle('dark');
+    markUnsaved();
+  }
+
+  // ---------- events ----------
+  editor.addEventListener('input', () => { markUnsaved(); updateStatus(); tryAutoLink(); });
+
+  // Detects a URL-looking word right after it's "finished" (followed by a
+  // space, so the user has moved past it) and turns it into a real <a> --
+  // matches http(s)://, www.*, or bare domains like naver.com / example.co.kr
+  const URL_REGEX = /((?:https?:\/\/)?(?:www\.)?[a-zA-Z0-9][a-zA-Z0-9-]*(?:\.[a-zA-Z0-9-]+)*\.(?:com|net|org|io|co|kr|dev|app|edu|gov|info|xyz|me|us|uk|jp|cn))(?:\/[^\s<]*)?/gi;
+
+  function tryAutoLink(){
+    const sel = window.getSelection();
+    if(!sel.rangeCount || !sel.isCollapsed) return;
+    const node = sel.anchorNode;
+    if(!node || node.nodeType !== Node.TEXT_NODE) return;
+    if(!editor.contains(node)) return;
+    if(node.parentElement && node.parentElement.closest('a')) return; // already inside a link
+
+    const text = node.textContent;
+    const caretOffset = sel.anchorOffset;
+    URL_REGEX.lastIndex = 0;
+    let m;
+    while((m = URL_REGEX.exec(text))){
+      const start = m.index, end = start + m[0].length;
+      // only linkify once the user has typed past it (a space/newline follows)
+      const hasTrailingSpace = end < text.length && /\s/.test(text[end]);
+      if(hasTrailingSpace && end <= caretOffset){
+        linkifyRange(node, start, end, m[0]);
+        return; // one at a time; the next input event will catch the rest
+      }
+    }
+  }
+
+  function linkifyRange(node, start, end, matchedText){
+    const range = document.createRange();
+    range.setStart(node, start);
+    range.setEnd(node, end);
+    const a = document.createElement('a');
+    a.href = /^https?:\/\//i.test(matchedText) ? matchedText : 'https://' + matchedText;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    try{ range.surroundContents(a); }catch(err){ /* range crossed a non-text boundary, skip */ }
+  }
+  editor.addEventListener('keyup', refreshToolbarState);
+  editor.addEventListener('mouseup', refreshToolbarState);
+
+  window.addEventListener('beforeunload', (e) => {
+    if(unsaved){ e.preventDefault(); e.returnValue = ''; }
+  });
+
+  // keyboard shortcuts
+  document.addEventListener('keydown', (e) => {
+    if(!(e.ctrlKey || e.metaKey)) return;
+    const k = e.key.toLowerCase();
+    if(k === 'n'){ e.preventDefault(); doNew(); }
+    else if(k === 'o'){ e.preventDefault(); doOpen(); }
+    else if(k === 's'){ e.preventDefault(); doSave(); }
+    else if(k === 'b'){ e.preventDefault(); toggleInline('bold'); }
+    else if(k === 'i'){ e.preventDefault(); toggleInline('italic'); }
+    else if(k === 'u'){ e.preventDefault(); toggleInline('underline'); }
+  });
+
+  // ---------- Paint ---------- 
+  const Paint = (function(){
+    const overlay = document.getElementById('paintOverlay');
+    const wrap = document.getElementById('paintCanvasWrap');
+    const layerListEl = document.getElementById('paintLayerList');
+    const sizeInput = document.getElementById('paintBrushSize');
+    const colorInput = document.getElementById('paintBrushColor');
+    const opacityInput = document.getElementById('paintOpacity');
+
+    let canvasW = 1920, canvasH = 1080;
+    let layers = [];      // {name, canvas, ctx, visible}
+    let activeIndex = 0;
+    let displayCanvas, displayCtx;
+    let tool = 'brush';
+    let drawing = false;
+    let lastPt = null;
+    let zoom = 1;
+    const ZOOM_MIN = 0.25, ZOOM_MAX = 6, ZOOM_STEP = 0.25;
+    const zoomInput = document.getElementById('paintZoomInput');
+
+    // floating lasso selection
+    let selection = null; // {canvas, ox, oy} offset relative to original spot
+    let lassoPts = null;
+    let dragStart = null;
+    let dragOffset = {x:0,y:0};
+
+    // undo/redo: snapshot the whole layer stack before each mutating action
+    let historyStack = [];
+    let redoStack = [];
+    const HISTORY_LIMIT = 25;
+    const undoBtn = document.getElementById('paintUndoBtn');
+    const redoBtn = document.getElementById('paintRedoBtn');
+
+    function snapshotState(){
+      return {
+        canvasW, canvasH, activeIndex,
+        layers: layers.map(l => ({ name:l.name, visible:l.visible, alphaLocked:l.alphaLocked, data:l.canvas.toDataURL() }))
+      };
+    }
+    function pushHistory(){
+      historyStack.push(snapshotState());
+      if(historyStack.length > HISTORY_LIMIT) historyStack.shift();
+      redoStack.length = 0;
+      updateUndoRedoButtons();
+    }
+    function updateUndoRedoButtons(){
+      if(undoBtn) undoBtn.disabled = historyStack.length === 0;
+      if(redoBtn) redoBtn.disabled = redoStack.length === 0;
+    }
+    async function loadLayersFromState(state){
+      const built = [];
+      for(const ld of state.layers){
+        const canvas = document.createElement('canvas');
+        canvas.width = state.canvasW; canvas.height = state.canvasH;
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+        await new Promise(resolve => {
+          const img = new Image();
+          img.onload = () => { ctx.drawImage(img, 0, 0); resolve(); };
+          img.src = ld.data;
+        });
+        built.push({ name:ld.name, canvas, ctx, visible:ld.visible, alphaLocked:!!ld.alphaLocked });
+      }
+      return built;
+    }
+    async function applyState(state){
+      const sizeChanged = state.canvasW !== canvasW || state.canvasH !== canvasH;
+      canvasW = state.canvasW; canvasH = state.canvasH;
+      layers = await loadLayersFromState(state);
+      activeIndex = Math.min(state.activeIndex, layers.length - 1);
+      selection = null; lassoPts = null;
+      if(sizeChanged || !displayCanvas){
+        buildCanvasDom();
+        fitZoomToView();
+      }
+      renderLayerList();
+      render();
+    }
+    async function undo(){
+      if(historyStack.length === 0) return;
+      redoStack.push(snapshotState());
+      const state = historyStack.pop();
+      await applyState(state);
+      updateUndoRedoButtons();
+    }
+    async function redo(){
+      if(redoStack.length === 0) return;
+      historyStack.push(snapshotState());
+      const state = redoStack.pop();
+      await applyState(state);
+      updateUndoRedoButtons();
+    }
+
+    function makeLayer(name){
+      const c = document.createElement('canvas');
+      c.width = canvasW; c.height = canvasH;
+      const ctx = c.getContext('2d');
+      ctx.imageSmoothingEnabled = false;
+      return { name, canvas:c, ctx, visible:true, alphaLocked:false };
+    }
+
+    function buildCanvasDom(){
+      wrap.innerHTML = '';
+      displayCanvas = document.createElement('canvas');
+      displayCanvas.width = canvasW; displayCanvas.height = canvasH;
+      displayCtx = displayCanvas.getContext('2d');
+      displayCtx.imageSmoothingEnabled = false;
+      wrap.appendChild(displayCanvas);
+      applyZoom();
+
+      displayCanvas.addEventListener('pointerdown', onPointerDown);
+      displayCanvas.addEventListener('pointermove', onPointerMove);
+      displayCanvas.addEventListener('pointerup', onPointerUp);
+      displayCanvas.addEventListener('pointerleave', onPointerUp);
+    }
+
+    // zoom only changes the CSS display size, never the underlying bitmap
+    // resolution -- getPos() below already converts screen px back to
+    // canvas px via the bounding rect, so drawing stays accurate at any zoom.
+    function applyZoom(){
+      const w = Math.round(canvasW * zoom), h = Math.round(canvasH * zoom);
+      wrap.style.width = w + 'px';
+      wrap.style.height = h + 'px';
+      if(displayCanvas){
+        displayCanvas.style.width = w + 'px';
+        displayCanvas.style.height = h + 'px';
+      }
+      if(zoomInput) zoomInput.value = Math.round(zoom * 100);
+    }
+    function zoomIn(){ zoom = Math.min(ZOOM_MAX, zoom + ZOOM_STEP); applyZoom(); }
+    function zoomOut(){ zoom = Math.max(ZOOM_MIN, zoom - ZOOM_STEP); applyZoom(); }
+    function zoomReset(){ zoom = 1; applyZoom(); }
+    function zoomToInputValue(){
+      const v = parseInt(zoomInput.value, 10);
+      if(!v || isNaN(v)){ applyZoom(); return; } // invalid: snap back to current zoom
+      const clamped = Math.max(ZOOM_MIN * 100, Math.min(ZOOM_MAX * 100, v));
+      zoom = clamped / 100;
+      applyZoom();
+    }
+
+    function resetCanvas(w, h){
+      canvasW = w; canvasH = h;
+      layers = [makeLayer('Layer 1')];
+      activeIndex = 0;
+      selection = null; lassoPts = null;
+      buildCanvasDom();
+      fitZoomToView();
+      renderLayerList();
+      render();
+    }
+
+    // fit the whole canvas into the visible Paint area on first open / new canvas,
+    // since a 1920x1080 canvas at 100% is bigger than the screen
+    function fitZoomToView(){
+      const areaEl = document.getElementById('paintCanvasArea');
+      const availW = Math.max(50, areaEl.clientWidth - 24);
+      const availH = Math.max(50, areaEl.clientHeight - 24);
+      const fit = Math.min(availW / canvasW, availH / canvasH, 1);
+      zoom = Math.max(ZOOM_MIN, fit);
+      applyZoom();
+    }
+
+    function renderLayerList(){
+      layerListEl.innerHTML = '';
+      // show topmost layer first in the list
+      for(let i = layers.length - 1; i >= 0; i--){
+        const layer = layers[i];
+        const row = document.createElement('div');
+        row.className = 'layer-row' + (i === activeIndex ? ' active' : '');
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.title = 'Visible';
+        cb.checked = layer.visible;
+        cb.addEventListener('click', (e) => { e.stopPropagation(); layer.visible = cb.checked; render(); });
+        const span = document.createElement('span');
+        span.textContent = layer.name;
+        const alphaLabel = document.createElement('label');
+        alphaLabel.className = 'alpha-lock-label';
+        alphaLabel.title = 'Lock alpha: brush/fill only affects pixels already painted on this layer';
+        const alphaCb = document.createElement('input');
+        alphaCb.type = 'checkbox';
+        alphaCb.checked = !!layer.alphaLocked;
+        alphaCb.addEventListener('click', (e) => { e.stopPropagation(); layer.alphaLocked = alphaCb.checked; });
+        alphaLabel.appendChild(alphaCb);
+        alphaLabel.appendChild(document.createTextNode('A'));
+        row.appendChild(cb);
+        row.appendChild(span);
+        row.appendChild(alphaLabel);
+        row.addEventListener('click', () => { activeIndex = i; renderLayerList(); });
+        layerListEl.appendChild(row);
+      }
+    }
+
+    function render(){
+      displayCtx.clearRect(0, 0, canvasW, canvasH);
+      layers.forEach(l => { if(l.visible) displayCtx.drawImage(l.canvas, 0, 0); });
+      if(selection){
+        displayCtx.drawImage(selection.canvas, selection.ox + dragOffset.x, selection.oy + dragOffset.y);
+      }
+      if(lassoPts && lassoPts.length > 1){
+        displayCtx.save();
+        displayCtx.setLineDash([4,3]);
+        displayCtx.strokeStyle = '#000';
+        displayCtx.lineWidth = 1;
+        displayCtx.beginPath();
+        displayCtx.moveTo(lassoPts[0].x, lassoPts[0].y);
+        for(const p of lassoPts) displayCtx.lineTo(p.x, p.y);
+        displayCtx.stroke();
+        displayCtx.restore();
+      }
+    }
+
+    function commitSelectionIfAny(){
+      if(!selection) return;
+      pushHistory();
+      const layer = layers[activeIndex];
+      layer.ctx.drawImage(selection.canvas, selection.ox + dragOffset.x, selection.oy + dragOffset.y);
+      selection = null;
+      dragOffset = {x:0,y:0};
+      render();
+    }
+
+    function getPos(e){
+      const rect = displayCanvas.getBoundingClientRect();
+      const scaleX = canvasW / rect.width, scaleY = canvasH / rect.height;
+      return { x:(e.clientX - rect.left) * scaleX, y:(e.clientY - rect.top) * scaleY };
+    }
+
+    // pixel-art style stamped brush: snaps to a grid the size of the brush
+    // so strokes look like chunky pixels instead of smooth antialiased lines
+    function stampLine(ctx, from, to, size, color, erase, opacity, alphaLocked){
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      ctx.fillStyle = color;
+      ctx.globalAlpha = (typeof opacity === 'number') ? opacity : 1;
+      if(erase) ctx.globalCompositeOperation = 'destination-out';
+      else if(alphaLocked) ctx.globalCompositeOperation = 'source-atop'; // only paint over existing opaque pixels
+      const dx = to.x - from.x, dy = to.y - from.y;
+      const dist = Math.max(Math.hypot(dx, dy), 1);
+      const step = Math.max(size / 2, 1);
+      const count = Math.ceil(dist / step);
+      for(let i = 0; i <= count; i++){
+        const t = i / count;
+        const px = from.x + dx * t, py = from.y + dy * t;
+        const gx = Math.floor(px / size) * size;
+        const gy = Math.floor(py / size) * size;
+        ctx.fillRect(gx, gy, size, size);
+      }
+      ctx.restore();
+    }
+
+    function getOpacity(){
+      const v = parseInt(opacityInput.value, 10);
+      if(isNaN(v)) return 1;
+      return Math.max(1, Math.min(100, v)) / 100;
+    }
+
+    function pickColorAt(pos){
+      const x = Math.min(canvasW - 1, Math.max(0, Math.floor(pos.x)));
+      const y = Math.min(canvasH - 1, Math.max(0, Math.floor(pos.y)));
+      const data = displayCtx.getImageData(x, y, 1, 1).data;
+      const hex = '#' + [data[0], data[1], data[2]].map(v => v.toString(16).padStart(2, '0')).join('');
+      colorInput.value = hex;
+    }
+
+    let draggingSelection = false;
+    let baseOffset = {x:0,y:0};
+    function isLassoTool(t){ return t === 'lasso' || t === 'lasso-fill' || t === 'lasso-erase'; }
+
+    function onPointerDown(e){
+      e.preventDefault();
+      displayCanvas.setPointerCapture(e.pointerId);
+      const pos = getPos(e);
+
+      if(tool === 'eyedropper'){
+        pickColorAt(pos);
+        // switch back to brush automatically, like most paint apps do
+        tool = 'brush';
+        document.querySelectorAll('#paintToolbar [data-tool]').forEach(b => b.classList.toggle('tool-active', b.dataset.tool === 'brush'));
+        return;
+      }
+
+      if(isLassoTool(tool)){
+        if(tool === 'lasso' && selection){
+          // an existing floating selection: drag it around instead of starting a new lasso
+          draggingSelection = true;
+          dragStart = pos;
+          baseOffset = {...dragOffset};
+          return;
+        }
+        lassoPts = [pos];
+        drawing = true;
+        return;
+      }
+      // if there's a pending floating selection and user picks brush/eraser, commit it first
+      if(selection) commitSelectionIfAny();
+      pushHistory();
+      drawing = true;
+      lastPt = pos;
+      const layer = layers[activeIndex];
+      stampLine(layer.ctx, pos, pos, parseInt(sizeInput.value,10)||4, colorInput.value, tool==='eraser', getOpacity(), layer.alphaLocked);
+      render();
+      markUnsaved();
+    }
+
+    function onPointerMove(e){
+      if(draggingSelection){
+        const pos = getPos(e);
+        dragOffset = { x: baseOffset.x + (pos.x - dragStart.x), y: baseOffset.y + (pos.y - dragStart.y) };
+        render();
+        return;
+      }
+      if(!drawing) return;
+      const pos = getPos(e);
+      if(isLassoTool(tool)){
+        lassoPts.push(pos);
+        render();
+        return;
+      }
+      const layer = layers[activeIndex];
+      stampLine(layer.ctx, lastPt, pos, parseInt(sizeInput.value,10)||4, colorInput.value, tool==='eraser', getOpacity(), layer.alphaLocked);
+      lastPt = pos;
+      render();
+    }
+
+    function onPointerUp(e){
+      if(draggingSelection){ draggingSelection = false; return; }
+      if(!drawing) return;
+      drawing = false;
+      if(isLassoTool(tool) && lassoPts && lassoPts.length > 2){
+        if(tool === 'lasso') finalizeLasso();
+        else if(tool === 'lasso-fill') finalizeLassoFill();
+        else if(tool === 'lasso-erase') finalizeLassoErase();
+      }
+      lastPt = null;
+    }
+
+    function lassoPathOnto(ctx){
+      ctx.beginPath();
+      ctx.moveTo(lassoPts[0].x, lassoPts[0].y);
+      for(const p of lassoPts) ctx.lineTo(p.x, p.y);
+      ctx.closePath();
+    }
+
+    // lasso-fill: paint the current brush color inside the drawn shape, directly on the active layer
+    function finalizeLassoFill(){
+      pushHistory();
+      const layer = layers[activeIndex];
+      layer.ctx.save();
+      layer.ctx.fillStyle = colorInput.value;
+      layer.ctx.globalAlpha = getOpacity();
+      if(layer.alphaLocked) layer.ctx.globalCompositeOperation = 'source-atop';
+      lassoPathOnto(layer.ctx);
+      layer.ctx.fill();
+      layer.ctx.restore();
+      lassoPts = null;
+      render();
+      markUnsaved();
+    }
+
+    // lasso-erase: clear pixels inside the drawn shape on the active layer, no floating selection
+    function finalizeLassoErase(){
+      pushHistory();
+      const layer = layers[activeIndex];
+      layer.ctx.save();
+      layer.ctx.globalCompositeOperation = 'destination-out';
+      lassoPathOnto(layer.ctx);
+      layer.ctx.fill();
+      layer.ctx.restore();
+      lassoPts = null;
+      render();
+      markUnsaved();
+    }
+
+    function finalizeLasso(){
+      pushHistory();
+      const layer = layers[activeIndex];
+      // build mask of the lassoed area
+      const mask = document.createElement('canvas');
+      mask.width = canvasW; mask.height = canvasH;
+      const mctx = mask.getContext('2d');
+      mctx.fillStyle = '#fff';
+      lassoPathOnto(mctx);
+      mctx.fill();
+
+      // extract selected pixels from active layer
+      const sel = document.createElement('canvas');
+      sel.width = canvasW; sel.height = canvasH;
+      const sctx = sel.getContext('2d');
+      sctx.drawImage(layer.canvas, 0, 0);
+      sctx.globalCompositeOperation = 'destination-in';
+      sctx.drawImage(mask, 0, 0);
+
+      // remove those pixels from the original layer
+      layer.ctx.save();
+      layer.ctx.globalCompositeOperation = 'destination-out';
+      layer.ctx.drawImage(mask, 0, 0);
+      layer.ctx.restore();
+
+      selection = { canvas: sel, ox: 0, oy: 0 };
+      dragOffset = { x:0, y:0 };
+      lassoPts = null;
+      render();
+      markUnsaved();
+    }
+
+    function open(){
+      overlay.classList.add('show');
+      if(layers.length === 0){
+        resetCanvas(canvasW, canvasH);
+      }
+    }
+    function close(){
+      commitSelectionIfAny();
+      overlay.classList.remove('show');
+    }
+
+    function insertIntoDocument(){
+      commitSelectionIfAny();
+      const out = document.createElement('canvas');
+      out.width = canvasW; out.height = canvasH;
+      const octx = out.getContext('2d');
+      layers.forEach(l => { if(l.visible) octx.drawImage(l.canvas, 0, 0); });
+      const dataUrl = out.toDataURL('image/png');
+
+      editor.focus();
+      const img = document.createElement('img');
+      img.src = dataUrl;
+      img.style.maxWidth = '400px';
+      bindImageInteractions(img);
+      const sel = document.getSelection();
+      if(sel.rangeCount > 0 && editor.contains(sel.anchorNode)){
+        const range = sel.getRangeAt(0);
+        range.collapse(false);
+        range.insertNode(img);
+      } else {
+        editor.appendChild(img);
+      }
+      selectImage(img);
+      markUnsaved();
+      updateStatus();
+      close();
+    }
+
+    // ---- tool buttons ----
+    document.querySelectorAll('#paintToolbar [data-tool]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if(selection) commitSelectionIfAny();
+        tool = btn.dataset.tool;
+        document.querySelectorAll('#paintToolbar [data-tool]').forEach(b => b.classList.toggle('tool-active', b === btn));
+      });
+    });
+    document.querySelector('#paintToolbar [data-tool="brush"]').classList.add('tool-active');
+
+    document.getElementById('paintClearLayer').addEventListener('click', () => {
+      pushHistory();
+      const layer = layers[activeIndex];
+      layer.ctx.clearRect(0, 0, canvasW, canvasH);
+      render();
+      markUnsaved();
+    });
+
+    document.getElementById('paintAddLayer').addEventListener('click', () => {
+      pushHistory();
+      layers.push(makeLayer('Layer ' + (layers.length + 1)));
+      activeIndex = layers.length - 1;
+      renderLayerList();
+      render();
+    });
+    document.getElementById('paintDelLayer').addEventListener('click', () => {
+      if(layers.length <= 1) return;
+      pushHistory();
+      layers.splice(activeIndex, 1);
+      activeIndex = Math.max(0, activeIndex - 1);
+      renderLayerList();
+      render();
+    });
+    document.getElementById('paintDupLayer').addEventListener('click', () => {
+      pushHistory();
+      const src = layers[activeIndex];
+      const dup = makeLayer(src.name + ' copy');
+      dup.ctx.drawImage(src.canvas, 0, 0);
+      dup.visible = src.visible;
+      dup.alphaLocked = src.alphaLocked;
+      layers.splice(activeIndex + 1, 0, dup);
+      activeIndex = activeIndex + 1;
+      renderLayerList();
+      render();
+    });
+    document.getElementById('paintMergeDown').addEventListener('click', () => {
+      if(activeIndex <= 0) return; // nothing below to merge into
+      pushHistory();
+      const below = layers[activeIndex - 1];
+      below.ctx.drawImage(layers[activeIndex].canvas, 0, 0);
+      layers.splice(activeIndex, 1);
+      activeIndex = activeIndex - 1;
+      renderLayerList();
+      render();
+    });
+    document.getElementById('paintLayerUp').addEventListener('click', () => {
+      if(activeIndex >= layers.length - 1) return;
+      pushHistory();
+      [layers[activeIndex], layers[activeIndex+1]] = [layers[activeIndex+1], layers[activeIndex]];
+      activeIndex++;
+      renderLayerList();
+      render();
+    });
+    document.getElementById('paintLayerDown').addEventListener('click', () => {
+      if(activeIndex <= 0) return;
+      pushHistory();
+      [layers[activeIndex], layers[activeIndex-1]] = [layers[activeIndex-1], layers[activeIndex]];
+      activeIndex--;
+      renderLayerList();
+      render();
+    });
+
+    document.getElementById('paintNewCanvasBtn').addEventListener('click', () => {
+      document.getElementById('paintNewWidth').value = canvasW;
+      document.getElementById('paintNewHeight').value = canvasH;
+      document.getElementById('paintNewModal').classList.add('show');
+    });
+    document.getElementById('paintNewCancel').addEventListener('click', () => {
+      document.getElementById('paintNewModal').classList.remove('show');
+    });
+    document.getElementById('paintNewApply').addEventListener('click', () => {
+      const w = Math.max(16, Math.min(4000, parseInt(document.getElementById('paintNewWidth').value,10) || 1920));
+      const h = Math.max(16, Math.min(4000, parseInt(document.getElementById('paintNewHeight').value,10) || 1080));
+      document.getElementById('paintNewModal').classList.remove('show');
+      if(layers.length > 0) pushHistory();
+      resetCanvas(w, h);
+    });
+
+    document.getElementById('paintUndoBtn').addEventListener('click', undo);
+    document.getElementById('paintRedoBtn').addEventListener('click', redo);
+    updateUndoRedoButtons();
+    document.addEventListener('keydown', (e) => {
+      if(!overlay.classList.contains('show')) return;
+      if(!(e.ctrlKey || e.metaKey)) return;
+      const k = e.key.toLowerCase();
+      if(k === 'z' && !e.shiftKey){ e.preventDefault(); undo(); }
+      else if(k === 'y' || (k === 'z' && e.shiftKey)){ e.preventDefault(); redo(); }
+    });
+
+    document.getElementById('paintCloseX').addEventListener('click', close);
+    document.getElementById('paintCancelBtn').addEventListener('click', close);
+    document.getElementById('paintInsertBtn').addEventListener('click', insertIntoDocument);
+    document.getElementById('paintZoomIn').addEventListener('click', zoomIn);
+    document.getElementById('paintZoomOut').addEventListener('click', zoomOut);
+    document.getElementById('paintZoomReset').addEventListener('click', zoomReset);
+    zoomInput.addEventListener('change', zoomToInputValue);
+    zoomInput.addEventListener('keydown', (e) => {
+      if(e.key === 'Enter'){ e.preventDefault(); zoomToInputValue(); zoomInput.blur(); }
+      e.stopPropagation(); // don't let typing digits trigger other Paint shortcuts
+    });
+
+    return { open, close };
+  })();
+
+  titleUpdate();
+  updateStatus();
+})();
+</script>
+</body>
+</html>
